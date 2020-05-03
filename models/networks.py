@@ -257,7 +257,7 @@ class ResnetSetGenerator(nn.Module):
         n_downsampling = 2
         self.encoder_img = self.get_encoder(input_nc, n_downsampling, ngf, norm_layer, use_dropout, n_blocks, padding_type, use_bias)
         self.encoder_seg = self.get_encoder(1, n_downsampling, ngf, norm_layer, use_dropout, n_blocks, padding_type, use_bias)
-        self.decoder_img = self.get_decoder(output_nc, n_downsampling, 2 * ngf, norm_layer, use_bias)  # 2*ngf
+        self.decoder_img = self.get_decoder(output_nc, n_downsampling, 3 * ngf, norm_layer, use_bias)  # 3*ngf
         self.decoder_seg = self.get_decoder(1, n_downsampling, 3 * ngf, norm_layer, use_bias)  # 3*ngf
 
     def get_encoder(self, input_nc, n_downsampling, ngf, norm_layer, use_dropout, n_blocks, padding_type, use_bias):
@@ -309,17 +309,23 @@ class ResnetSetGenerator(nn.Module):
         enc_segs_sum = torch.sum(enc_segs, dim=0, keepdim=True)  # aggregated set feature
 
         # run decoder
-        feat = torch.cat([enc_img, enc_segs_sum], dim=1)
-        out = [self.decoder_img(feat)]
+        enc_dec_segs = list()
+        out = []
         idx = 0
         for i in range(segs.size(1)):
             if mean[i] > 0:
                 enc_seg = enc_segs[idx].unsqueeze(0)  # (1, ngf, w, h)
                 idx += 1  # move to next index
                 feat = torch.cat([enc_seg, enc_img, enc_segs_sum], dim=1)
-                out += [self.decoder_seg(feat)]
+                dec_seg = self.decoder_seg(feat)
+                out += [dec_seg]
+                enc_dec_segs.append(self.encoder_seg(dec_seg))
             else:
                 out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
+        enc_dec_segs = torch.cat(enc_dec_segs)
+        enc_dec_segs_sum = torch.sum(enc_dec_segs, dim=0, keepdim=True)  # aggregated set feature
+        feat = torch.cat([enc_img, enc_segs_sum, enc_dec_segs_sum], dim=1)
+        out = [self.decoder_img(feat)] + out
         return torch.cat(out, dim=1)
 
 
