@@ -348,11 +348,12 @@ class ResnetSetGenerator(nn.Module):
                 enc_seg = enc_segs[idx].unsqueeze(0)  # (1, ngf, w, h)
                 idx += 1  # move to next index
                 feat = torch.cat([enc_seg, enc_img, enc_segs_sum], dim=1)
-                dec_seg = self.decoder_seg(feat)
-                out += [dec_seg]
+                dec_seg_1 = self.decoder_seg(feat)
+                out += [dec_seg_1]
                 enc_dec_segs.append(self.encoder_seg(dec_seg))
             else:
                 out += [segs[:, i, :, :].unsqueeze(1)]  # skip empty segmentation
+
         enc_dec_segs = torch.cat(enc_dec_segs)
         enc_dec_segs_sum = torch.sum(enc_dec_segs, dim=0, keepdim=True)  # aggregated set feature
         #ADD_NEW
@@ -371,9 +372,9 @@ class ResnetSetGenerator(nn.Module):
         enc_dec_segs_2 = torch.cat(enc_dec_segs_2)
         enc_dec_segs_sum_2 = torch.sum(enc_dec_segs_2, dim=0, keepdim=True)  # aggregated set feature
 
-        sum_segs = torch.max(enc_segs_sum,enc_segs_2_sum)
-        sum_dec_segs = torch.max(enc_dec_segs_sum,enc_dec_segs_sum_2)
-        feat = torch.cat([enc_img, sum_segs, sum_dec_segs], dim=1)
+        
+        sum_segs = torch.max(enc_dec_segs_sum,enc_dec_segs_sum_2)
+        feat = torch.cat([enc_img, sum_segs], dim=1)
         out = [self.decoder_img(feat)] + out
 
         return torch.cat(out, dim=1)
