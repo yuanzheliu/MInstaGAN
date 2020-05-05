@@ -19,8 +19,8 @@ def create_argument_parser():
 	parser.add_argument('--cat11', type=str, default='jeans', help='category 11')
 	parser.add_argument('--cat12', type=str, default='skirt', help='category 12')
 	# change cat 2_1 to cat 2_2
-	parser.add_argument('--cat21', type=str, default='coat', help='category 21')
-	parser.add_argument('--cat22', type=str, default='blouse', help='category 22')
+	parser.add_argument('--cat21', type=str, default='shoes', help='category 21')
+	parser.add_argument('--cat22', type=str, default='boots', help='category 22')
 
 	parser.add_argument('--jeansOrcoat', type = str, default = 'jeans', help= 'generate jeans mask or coat mask')
 	return parser
@@ -63,7 +63,7 @@ def generate_ccp_dataset_train(args, imset, cat1, cat2):
 				img.save(img_path / '{}.png'.format(ann_id))
 				seg1 = (ann == cat_id_1).astype('uint8')  # get segment of given category
 				seg2 = (ann == cat_id_2).astype('uint8')
-				if args.jeansOrcoat == 'jeans':
+				if args.jeansOrcoat == 'shoes':
 					seg1 = Image.fromarray(seg1 * 255)
 					seg1.save(seg_path / '{}_0.png'.format(ann_id))
 				else:
