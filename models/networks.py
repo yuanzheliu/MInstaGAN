@@ -306,6 +306,8 @@ class ResnetSetGenerator(nn.Module):
                 seg = segs[:, i, :, :].unsqueeze(1)
                 enc_segs.append(self.encoder_seg(seg))
         enc_segs = torch.cat(enc_segs)
+        # TODO: potential bugs, now target to one instance
+        # enc_segs_sum = enc_segs
         enc_segs_sum = torch.sum(enc_segs, dim=0, keepdim=True)  # aggregated set feature
 
         # run decoder

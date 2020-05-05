@@ -20,7 +20,7 @@ class UnalignedSegDataset(BaseDataset):
 		self.root = opt.dataroot
 		self.dir_A = os.path.join(opt.dataroot, opt.phase + 'A')
 		self.dir_B = os.path.join(opt.dataroot, opt.phase + 'B')
-		self.max_instances = 20  # default: 20
+		self.max_instances = 1  # default: 20
 		self.seg_dir = 'seg'  # default: 'seg'
 
 		self.A_paths = sorted(make_dataset(self.dir_A))

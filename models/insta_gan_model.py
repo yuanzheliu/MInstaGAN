@@ -16,8 +16,8 @@ class InstaGANModel(BaseModel):
 		# default CycleGAN did not use dropout
 		parser.set_defaults(no_dropout=True)
 		parser.add_argument('--set_order', type=str, default='decreasing', help='order of segmentation')
-		parser.add_argument('--ins_max', type=int, default=4, help='maximum number of instances to forward')
-		parser.add_argument('--ins_per', type=int, default=2, help='number of instances to forward, for one pass')
+		parser.add_argument('--ins_max', type=int, default=1, help='maximum number of instances to forward')
+		parser.add_argument('--ins_per', type=int, default=1, help='number of instances to forward, for one pass')
 		if is_train:
 			parser.add_argument('--lambda_A', type=float, default=10.0, help='weight for cycle loss (A -> B -> A)')
 			parser.add_argument('--lambda_B', type=float, default=10.0, help='weight for cycle loss (B -> A -> B)')
