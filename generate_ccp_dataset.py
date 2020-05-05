@@ -15,12 +15,10 @@ def create_argument_parser():
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--data_root', type=str, default='datasets/clothing-co-parsing')
 	parser.add_argument('--save_root', type=str, default='datasets/jeans2skirt_ccp')
-	# change cat 1_1 to cat 1_2
-	parser.add_argument('--cat11', type=str, default='jeans', help='category 11')
-	parser.add_argument('--cat12', type=str, default='skirt', help='category 12')
-	# change cat 2_1 to cat 2_2
-	parser.add_argument('--cat21', type=str, default='coat', help='category 21')
-	parser.add_argument('--cat22', type=str, default='blouse', help='category 22')
+	parser.add_argument('--cat1', type=str, default='jeans', help='category 1')
+	parser.add_argument('--cat2', type=str, default='skirt', help='category 2')
+	parser.add_argument('--cat1_', type=str, default='coat', help='category 1 second')
+	parser.add_argument('--cat2_', type=str, default='blouse', help='category 2 second')
 	return parser
 
 def generate_ccp_dataset(args):
@@ -37,58 +35,59 @@ def generate_ccp_dataset(args):
 	args.save_root = Path(args.save_root)
 	args.save_root.mkdir()
 
-	generate_ccp_dataset_train(args, 'A', args.cat11, args.cat21)
-	generate_ccp_dataset_train(args, 'B', args.cat12, args.cat22)
-	generate_ccp_dataset_val(args, 'A', args.cat11, args.cat21)
-	generate_ccp_dataset_val(args, 'B', args.cat12, args.cat22)
+	generate_ccp_dataset_train(args, 'A', args.cat1, args.cat1_)
+	generate_ccp_dataset_train(args, 'B', args.cat2, args.cat2_)
+
+	generate_ccp_dataset_val(args, 'A', args.cat1, args.cat1_)
+	generate_ccp_dataset_val(args, 'B', args.cat2, args.cat2_)
+	
+
+
 
 def generate_ccp_dataset_train(args, imset, cat1, cat2):
 	img_path = args.save_root / 'train{}'.format(imset)
 	seg_path = args.save_root / 'train{}_seg'.format(imset)
+	seg_path_2 = args.save_root / 'train{}_seg_2'.format(imset)
 	img_path.mkdir()
 	seg_path.mkdir()
+	seg_path_2.mkdir()
 
-	cat_id_1 = get_cat_id(args.label_list, cat1)
+	cat_id = get_cat_id(args.label_list, cat1)
 	cat_id_2 = get_cat_id(args.label_list, cat2)
 
 	pb = tqdm(total=len(args.pix_ann_ids))
 	pb.set_description('train{}'.format(imset))
 	for ann_id in args.pix_ann_ids:
 		ann = sio.loadmat(str(args.pix_ann_root / '{}.mat'.format(ann_id)))['groundtruth']
-		if np.isin(ann, cat_id_1).sum() > 0:
-			if np.isin(ann, cat_id_2).sum() > 0:
-				img = Image.open(args.img_root / '{}.jpg'.format(ann_id))
-				img.save(img_path / '{}.png'.format(ann_id))
-				seg1 = (ann == cat_id_1).astype('uint8')  # get segment of given category
-				seg2 = (ann == cat_id_2).astype('uint8')
-				row,col = seg1.shape
-				for i in range(0,row):
-					for j in range(0,col):
-						if seg2[i][j]!=0:
-							seg1[i][j] = seg2[i][j]
-				seg1 = Image.fromarray(seg1 * 255)
-				seg1.save(seg_path / '{}_0.png'.format(ann_id))
+		if np.isin(ann, cat_id).sum() > 0 and np.isin(ann, cat_id_2).sum() > 0:
+			img = Image.open(args.img_root / '{}.jpg'.format(ann_id))
+			img.save(img_path / '{}.png'.format(ann_id))
+			seg = (ann == cat_id).astype('uint8')  # get segment 1 of given category
+			seg = Image.fromarray(seg * 255)
+			seg2 = (ann == cat_id_2).astype('uint8')  # get segment 2 of given category
+			seg2 = Image.fromarray(seg2 * 255)
+			seg.save(seg_path / '{}_0.png'.format(ann_id))
+			seg2.save(seg_path_2 / '{}_0.png'.format(ann_id))
 		pb.update(1)
 	pb.close()
 
 def generate_ccp_dataset_val(args, imset, cat1, cat2):
 	img_path = args.save_root / 'val{}'.format(imset)
 	seg_path = args.save_root / 'val{}_seg'.format(imset)
+	seg_path_2 = args.save_root / 'val{}_seg_2'.format(imset)
 	img_path.mkdir()
 	seg_path.mkdir()
+	seg_path_2.mkdir()
 
-	cat_id_1 = get_cat_id(args.label_list, cat1)
-	cat_id_2 = get_cat_id(args.label_list, cat2)
-
+	cat_id = get_cat_id(args.label_list, cat1)
 
 	pb = tqdm(total=len(args.img_ann_ids))
 	pb.set_description('val{}'.format(imset))
 	for ann_id in args.img_ann_ids:
 		ann = sio.loadmat(str(args.img_ann_root / '{}.mat'.format(ann_id)))['tags']
-		if np.isin(ann, cat_id_1).sum() > 0:
-			if np.isin(ann, cat_id_2).sum() > 0:
-				img = Image.open(args.img_root / '{}.jpg'.format(ann_id))
-				img.save(img_path / '{}.png'.format(ann_id))
+		if np.isin(ann, cat_id).sum() > 0:
+			img = Image.open(args.img_root / '{}.jpg'.format(ann_id))
+			img.save(img_path / '{}.png'.format(ann_id))
 		pb.update(1)
 	pb.close()
 

@@ -1,7 +1,10 @@
-# Move this generate_ccp_dataset_concat.py into ~/instagan-master/datasets/
+# Change generate_ccp_dataset.py into ~/instagan-master/datasets/
+# Change unaligned_seg_dataset.py into ~/instagan-master/data/
+# Change models into ~/instagan-master/
 
 ## 指令
-generate the jeans coats 2 skrit blouse combined mask:
+generate the jeans coats 2 skrit blouse seperate mask:
 ```
-python ./datasets/generate_ccp_dataset_concat.py --save_root ./datasets/jeanscoat2skirtblouse_ccp
+python ./datasets/generate_ccp_dataset.py --save_root ./datasets/jeanscoat2skirtblouse_ccp
 ```
+train the model
