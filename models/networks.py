@@ -644,7 +644,7 @@ class NLayerSetDiscriminator(nn.Module):
         out = self.classifier(feat)
         feat_2 = torch.cat([feat_img, feat_segs_2_sum], dim=1)
         out_2 = self.classifier_2(feat_2)
-        return torch.add(out,out_2)
+        return torch.min(out,out_2)
 
 
 class PixelDiscriminator(nn.Module):
