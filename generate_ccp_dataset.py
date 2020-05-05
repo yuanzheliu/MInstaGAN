@@ -79,15 +79,17 @@ def generate_ccp_dataset_val(args, imset, cat1, cat2):
 	seg_path.mkdir()
 	seg_path_2.mkdir()
 
-	cat_id = get_cat_id(args.label_list, cat1)
+	cat_id_1 = get_cat_id(args.label_list, cat1)
+	cat_id_2 = get_cat_id(args.label_list, cat2)
 
 	pb = tqdm(total=len(args.img_ann_ids))
 	pb.set_description('val{}'.format(imset))
 	for ann_id in args.img_ann_ids:
 		ann = sio.loadmat(str(args.img_ann_root / '{}.mat'.format(ann_id)))['tags']
-		if np.isin(ann, cat_id).sum() > 0:
-			img = Image.open(args.img_root / '{}.jpg'.format(ann_id))
-			img.save(img_path / '{}.png'.format(ann_id))
+		if np.isin(ann, cat_id_1).sum() > 0:
+			if np.isin(ann, cat_id_2).sum() >0 :
+				img = Image.open(args.img_root / '{}.jpg'.format(ann_id))
+				img.save(img_path / '{}.png'.format(ann_id))
 		pb.update(1)
 	pb.close()
 
