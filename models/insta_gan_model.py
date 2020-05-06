@@ -284,15 +284,18 @@ class InstaGANModel(BaseModel):
 			self.loss_G_A = self.criterionGAN(self.netD_A(self.fake_B_mul), True)
 			self.loss_cyc_A = self.criterionCyc(self.rec_A_sng, self.real_A_sng) * lambda_A
 			self.loss_idt_B = self.criterionIdt(self.netG_B(self.real_A_sng), self.real_A_sng.detach()) * lambda_A * lambda_idt
-			weight_A = self.get_weight_for_ctx(self.real_A_seg_sng, self.fake_B_seg_sng)
+			
+			self.real_A_seg_merged = self.merge_masks(torch.cat([self.real_A_seg_sng, self.real_A_seg_2_sng], dim=1))
+			self.fake_B_seg_merged = self.merge_masks(torch.cat([self.fake_B_seg_sng, self.fake_B_seg_2_sng], dim=1))
+			weight_A = self.get_weight_for_ctx(self.real_A_seg_merged, self.fake_B_seg_merged)
 
 			#ADD_NEW
-			weight_A_2 = self.get_weight_for_ctx(self.real_A_seg_2_sng,self.fake_B_seg_2_sng)
+			#weight_A_2 = self.get_weight_for_ctx(self.real_A_seg_2_sng,self.fake_B_seg_2_sng)
 
 			#ADD_ON
 			ctx_A = self.weighted_L1_loss(self.real_A_img_sng, self.fake_B_img_sng, weight=weight_A)
-			ctx_A_2 = self.weighted_L1_loss(self.real_A_img_sng, self.fake_B_img_sng, weight=weight_A_2)
-			self.loss_ctx_A = torch.add(ctx_A,ctx_A_2) * lambda_A * lambda_ctx
+			#ctx_A_2 = self.weighted_L1_loss(self.real_A_img_sng, self.fake_B_img_sng, weight=weight_A_2)
+			self.loss_ctx_A = ctx_A * lambda_A * lambda_ctx
 			# self.loss_ctx_A = self.weighted_L1_loss(self.real_A_img_sng, self.fake_B_img_sng, weight=weight_A) * lambda_A * lambda_ctx
 		else:
 			self.loss_G_A = 0
@@ -305,15 +308,18 @@ class InstaGANModel(BaseModel):
 			self.loss_G_B = self.criterionGAN(self.netD_B(self.fake_A_mul), True)
 			self.loss_cyc_B = self.criterionCyc(self.rec_B_sng, self.real_B_sng) * lambda_B
 			self.loss_idt_A = self.criterionIdt(self.netG_A(self.real_B_sng), self.real_B_sng.detach()) * lambda_B * lambda_idt
-			weight_B = self.get_weight_for_ctx(self.real_B_seg_sng, self.fake_A_seg_sng)
+			
+			self.real_B_seg_merged = self.merge_masks(torch.cat([self.real_B_seg_sng, self.real_B_seg_2_sng], dim=1))
+			self.fake_A_seg_merged = self.merge_masks(torch.cat([self.fake_A_seg_sng, self.fake_A_seg_2_sng], dim=1))
+			weight_B = self.get_weight_for_ctx(self.real_B_seg_merged, self.fake_A_seg_merged)
 
 			#ADD_NEW
-			weight_B_2 = self.get_weight_for_ctx(self.real_B_seg_2_sng,self.fake_A_seg_2_sng)
+			#weight_B_2 = self.get_weight_for_ctx(self.real_B_seg_2_sng,self.fake_A_seg_2_sng)
 
 			#ADD_ON
 			ctx_B = self.weighted_L1_loss(self.real_B_img_sng, self.fake_A_img_sng, weight=weight_B)
-			ctx_B_2 = self.weighted_L1_loss(self.real_B_img_sng, self.fake_A_img_sng, weight=weight_B_2)
-			self.loss_ctx_B = torch.add(ctx_B,ctx_B_2) * lambda_A * lambda_ctx
+			#ctx_B_2 = self.weighted_L1_loss(self.real_B_img_sng, self.fake_A_img_sng, weight=weight_B_2)
+			self.loss_ctx_B = ctx_B * lambda_A * lambda_ctx
 			# self.loss_ctx_B = self.weighted_L1_loss(self.real_B_img_sng, self.fake_A_img_sng, weight=weight_B) * lambda_B * lambda_ctx
 		else:
 			self.loss_G_B = 0
