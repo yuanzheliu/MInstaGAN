@@ -22,6 +22,7 @@ class UnalignedSegDataset(BaseDataset):
 		self.dir_B = os.path.join(opt.dataroot, opt.phase + 'B')
 		self.max_instances = 1  # default: 20
 		self.seg_dir = 'seg'  # default: 'seg'
+		self.seg_dir_skin = 'seg_skin'
 
 		self.A_paths = sorted(make_dataset(self.dir_A))
 		self.B_paths = sorted(make_dataset(self.dir_B))
@@ -56,6 +57,9 @@ class UnalignedSegDataset(BaseDataset):
 		B_path = self.B_paths[index_B]
 		A_seg_path = A_path.replace('A', 'A_{}'.format(self.seg_dir))
 		B_seg_path = B_path.replace('B', 'B_{}'.format(self.seg_dir))
+		# seg path skin
+		A_seg_path_skin = A_path.replace('A', 'A_{}'.format(self.seg_dir_skin))
+		B_seg_path_skin = B_path.replace('B', 'B_{}'.format(self.seg_dir_skin))
 
 		A_idx = A_path.split('/')[-1].split('.')[0]
 		B_idx = B_path.split('/')[-1].split('.')[0]
@@ -70,6 +74,8 @@ class UnalignedSegDataset(BaseDataset):
 
 		A_segs = self.read_segs(A_seg_path, seed)
 		B_segs = self.read_segs(B_seg_path, seed)
+		A_segs_skin = self.read_segs(A_seg_path_skin, seed)
+		B_segs_skin = self.read_segs(B_seg_path_skin, seed)
 
 		if self.opt.direction == 'BtoA':
 			input_nc = self.opt.output_nc
@@ -88,6 +94,7 @@ class UnalignedSegDataset(BaseDataset):
 		return {'A': A, 'B': B,
 				'A_idx': A_idx, 'B_idx': B_idx,
 				'A_segs': A_segs, 'B_segs': B_segs,
+				'A_segs_skin': A_segs_skin, 'B_segs_skin': B_segs_skin,
 				'A_paths': A_path, 'B_paths': B_path}
 
 	def __len__(self):

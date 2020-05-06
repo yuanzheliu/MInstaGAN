@@ -23,6 +23,7 @@ class InstaGANModel(BaseModel):
 			parser.add_argument('--lambda_B', type=float, default=10.0, help='weight for cycle loss (B -> A -> B)')
 			parser.add_argument('--lambda_idt', type=float, default=1.0, help='use identity mapping. Setting lambda_idt other than 0 has an effect of scaling the weight of the identity mapping loss')
 			parser.add_argument('--lambda_ctx', type=float, default=1.0, help='use context preserving. Setting lambda_ctx other than 0 has an effect of scaling the weight of the context preserving loss')
+			parser.add_argument('--lambda_color', type=float, default=0.5, help='use color preserving. Setting lambda_color other than 0 has an effect of scaling the weight of the color preserving loss')
 
 		return parser
 
@@ -32,7 +33,7 @@ class InstaGANModel(BaseModel):
 		self.ins_iter = self.opt.ins_max // self.opt.ins_per  # number of forward iteration
 
 		# specify the training losses you want to print out. The program will call base_model.get_current_losses
-		self.loss_names = ['D_A', 'G_A', 'cyc_A', 'idt_A', 'ctx_A', 'D_B', 'G_B', 'cyc_B', 'idt_B', 'ctx_B']
+		self.loss_names = ['D_A', 'G_A', 'cyc_A', 'idt_A', 'ctx_A', 'color_A', 'D_B', 'G_B', 'cyc_B', 'idt_B', 'ctx_B', 'color_B']
 		# specify the images you want to save/display. The program will call base_model.get_current_visuals
 		visual_names_A_img = ['real_A_img', 'fake_B_img', 'rec_A_img']
 		visual_names_B_img = ['real_B_img', 'fake_A_img', 'rec_B_img']
@@ -112,6 +113,38 @@ class InstaGANModel(BaseModel):
 		"""L1 loss with given weight (used for context preserving loss)"""
 		return torch.mean(weight * torch.abs(src - tgt))
 
+	def get_avg_color(self, img, img_seg):
+		# 0 background, 1 skin
+		img_seg = (img_seg + 1) / 2 # dim (1,1,300,200)
+		img_seg = torch.cat((img_seg, img_seg, img_seg), dim=1)
+		img_part = img_seg * img # dim (1,3,300,200)
+		nonzero_count = (img_part != 0).sum(dim=2).sum(dim=2)
+		nonzero_sum = torch.sum(torch.sum(img_part,dim=2),dim=2)
+		avg_color = nonzero_sum / nonzero_count # dim (1,3)
+		return avg_color
+
+	def get_seg_diff(self, large_seg, small_seg):
+		# 0 background
+		large_seg = (large_seg + 1) / 2
+		small_seg = (small_seg + 1) / 2
+		diff = large_seg - small_seg # diff from (-1, 1)
+		return diff.clamp(max=1,min=0) * 2 - 1
+
+	# real_seg (e.g. jeans) is larger than fake_seg (e.g. skirt)
+	def calculate_skin_color_diff(self, real, fake, real_seg, fake_seg, real_seg_skin):
+		# real and fake image rgb value from (-1, 1)
+		skin_avg_color = self.get_avg_color(real, real_seg_skin)
+		diff_seg = self.get_seg_diff(real_seg, fake_seg) # e.g. leg
+		diff_part_avg_color = self.get_avg_color(fake, diff_seg)
+		return torch.mean(torch.abs(skin_avg_color - diff_part_avg_color)) # L1 loss between colors
+
+	# real_seg (e.g. skirt) is smaller than fake_seg (e.g. jeans)
+	def calculate_cloth_color_diff(self, real, fake, real_seg, fake_seg):
+		cloth_avg_color = self.get_avg_color(real,real_seg)
+		diff_seg = self.get_seg_diff(fake_seg, real_seg)
+		diff_part_avg_color = self.get_avg_color(fake, diff_seg)
+		return torch.mean(torch.abs(cloth_avg_color - diff_part_avg_color))
+
 	def split(self, x):
 		"""Split data into image and mask (only assume 3-channel image)"""
 		return x[:, :3, :, :], x[:, 3:, :, :]
@@ -124,10 +157,18 @@ class InstaGANModel(BaseModel):
 		real_B_segs = input['B_segs' if AtoB else 'A_segs']
 		self.real_A_segs = self.select_masks(real_A_segs).to(self.device)
 		self.real_B_segs = self.select_masks(real_B_segs).to(self.device)
+
+		real_A_segs_skin = input['A_segs_skin' if AtoB else 'B_segs_skin']
+		real_B_segs_skin = input['B_segs_skin' if AtoB else 'A_segs_skin']
+		self.real_A_segs_skin = self.select_masks(real_A_segs_skin).to(self.device)
+		self.real_B_segs_skin = self.select_masks(real_B_segs_skin).to(self.device)
+
 		self.real_A = torch.cat([self.real_A_img, self.real_A_segs], dim=1)
 		self.real_B = torch.cat([self.real_B_img, self.real_B_segs], dim=1)
 		self.real_A_seg = self.merge_masks(self.real_A_segs)  # merged mask
 		self.real_B_seg = self.merge_masks(self.real_B_segs)  # merged mask
+		self.real_A_seg_skin = self.merge_masks(self.real_A_segs_skin)  # merged mask
+		self.real_B_seg_skin = self.merge_masks(self.real_B_segs_skin)  # merged mask
 		self.image_paths = input['A_paths' if AtoB else 'B_paths']
 
 	def forward(self, idx=0):
@@ -135,6 +176,9 @@ class InstaGANModel(BaseModel):
 		self.real_A_seg_sng = self.real_A_segs[:, N*idx:N*(idx+1), :, :]  # ith mask
 		self.real_B_seg_sng = self.real_B_segs[:, N*idx:N*(idx+1), :, :]  # ith mask
 		empty = -torch.ones(self.real_A_seg_sng.size()).to(self.device)  # empty image
+
+		self.real_A_seg_skin_sng = self.real_A_segs_skin[:, N*idx:N*(idx+1), :, :]  # ith mask
+		self.real_B_seg_skin_sng = self.real_B_segs_skin[:, N*idx:N*(idx+1), :, :]  # ith mask
 
 		self.forward_A = (self.real_A_seg_sng + 1).sum() > 0  # check if there are remaining instances
 		self.forward_B = (self.real_B_seg_sng + 1).sum() > 0  # check if there are remaining instances
@@ -208,6 +252,7 @@ class InstaGANModel(BaseModel):
 		lambda_B = self.opt.lambda_B
 		lambda_idt = self.opt.lambda_idt
 		lambda_ctx = self.opt.lambda_ctx
+		lambda_color = self.opt.lambda_color
 
 		# backward A
 		if self.forward_A:
@@ -216,11 +261,13 @@ class InstaGANModel(BaseModel):
 			self.loss_idt_B = self.criterionIdt(self.netG_B(self.real_A_sng), self.real_A_sng.detach()) * lambda_A * lambda_idt
 			weight_A = self.get_weight_for_ctx(self.real_A_seg_sng, self.fake_B_seg_sng)
 			self.loss_ctx_A = self.weighted_L1_loss(self.real_A_img_sng, self.fake_B_img_sng, weight=weight_A) * lambda_A * lambda_ctx
+			self.loss_color_A = self.calculate_skin_color_diff(self.real_A_img_sng, self.fake_B_img_sng, self.real_A_seg_sng, self.fake_B_seg_sng, self.real_A_seg_skin_sng) * lambda_A * lambda_color
 		else:
 			self.loss_G_A = 0
 			self.loss_cyc_A = 0
 			self.loss_idt_B = 0
 			self.loss_ctx_A = 0
+			self.loss_color_A = 0
 
 		# backward B
 		if self.forward_B:
@@ -229,14 +276,16 @@ class InstaGANModel(BaseModel):
 			self.loss_idt_A = self.criterionIdt(self.netG_A(self.real_B_sng), self.real_B_sng.detach()) * lambda_B * lambda_idt
 			weight_B = self.get_weight_for_ctx(self.real_B_seg_sng, self.fake_A_seg_sng)
 			self.loss_ctx_B = self.weighted_L1_loss(self.real_B_img_sng, self.fake_A_img_sng, weight=weight_B) * lambda_B * lambda_ctx
+			self.loss_color_B = self.calculate_cloth_color_diff(self.real_B_img_sng, self.fake_A_img_sng, self.real_B_seg_sng, self.fake_A_seg_sng) * lambda_B * lambda_color
 		else:
 			self.loss_G_B = 0
 			self.loss_cyc_B = 0
 			self.loss_idt_A = 0
 			self.loss_ctx_B = 0
+			self.loss_color_B = 0
 
 		# combined loss
-		self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cyc_A + self.loss_cyc_B + self.loss_idt_A + self.loss_idt_B + self.loss_ctx_A + self.loss_ctx_B
+		self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_cyc_A + self.loss_cyc_B + self.loss_idt_A + self.loss_idt_B + self.loss_ctx_A + self.loss_ctx_B + self.loss_color_A + self.loss_color_B
 		self.loss_G.backward()
 
 	def backward_D_basic(self, netD, real, fake):

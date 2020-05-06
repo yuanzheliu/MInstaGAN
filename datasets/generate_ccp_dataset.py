@@ -45,22 +45,27 @@ def generate_ccp_dataset(args):
 def generate_ccp_dataset_train(args, imset, cat1, cat2):
 	img_path = args.save_root / 'train{}'.format(imset)
 	seg_path = args.save_root / 'train{}_seg'.format(imset)
+	seg_path_skin = args.save_root / 'train{}_seg_skin'.format(imset)
 	img_path.mkdir()
 	seg_path.mkdir()
+	seg_path_skin.mkdir()
 
 	cat_id_1 = get_cat_id(args.label_list, cat1)
 	cat_id_2 = get_cat_id(args.label_list, cat2)
+	cat_id_skin = get_cat_id(args.label_list, "skin")
 
 	pb = tqdm(total=len(args.pix_ann_ids))
 	pb.set_description('train{}'.format(imset))
 	for ann_id in args.pix_ann_ids:
 		ann = sio.loadmat(str(args.pix_ann_root / '{}.mat'.format(ann_id)))['groundtruth']
-		if np.isin(ann, cat_id_1).sum() > 0:
+		if np.isin(ann, cat_id_1).sum() > 0 and np.isin(ann, cat_id_skin).sum() > 0:
 			if np.isin(ann, cat_id_2).sum() > 0:
 				img = Image.open(args.img_root / '{}.jpg'.format(ann_id))
 				img.save(img_path / '{}.png'.format(ann_id))
 				seg1 = (ann == cat_id_1).astype('uint8')  # get segment of given category
 				seg2 = (ann == cat_id_2).astype('uint8')
+				segskin = (ann == cat_id_skin).astype('uint8')  # get segment skin of given category
+				segskin = Image.fromarray(segskin * 255)
 				row,col = seg1.shape
 				for i in range(0,row):
 					for j in range(0,col):
@@ -68,24 +73,28 @@ def generate_ccp_dataset_train(args, imset, cat1, cat2):
 							seg1[i][j] = seg2[i][j]
 				seg1 = Image.fromarray(seg1 * 255)
 				seg1.save(seg_path / '{}_0.png'.format(ann_id))
+				segskin.save(seg_path_skin / '{}_0.png'.format(ann_id))
 		pb.update(1)
 	pb.close()
 
 def generate_ccp_dataset_val(args, imset, cat1, cat2):
 	img_path = args.save_root / 'val{}'.format(imset)
 	seg_path = args.save_root / 'val{}_seg'.format(imset)
+	seg_path_skin = args.save_root / 'val{}_seg_skin'.format(imset)
 	img_path.mkdir()
 	seg_path.mkdir()
+	seg_path_skin.mkdir()
 
 	cat_id_1 = get_cat_id(args.label_list, cat1)
 	cat_id_2 = get_cat_id(args.label_list, cat2)
+	cat_id_skin = get_cat_id(args.label_list, "skin")
 
 
 	pb = tqdm(total=len(args.img_ann_ids))
 	pb.set_description('val{}'.format(imset))
 	for ann_id in args.img_ann_ids:
 		ann = sio.loadmat(str(args.img_ann_root / '{}.mat'.format(ann_id)))['tags']
-		if np.isin(ann, cat_id_1).sum() > 0:
+		if np.isin(ann, cat_id_1).sum() > 0 and np.isin(ann, cat_id_skin).sum() > 0: 
 			if np.isin(ann, cat_id_2).sum() > 0:
 				img = Image.open(args.img_root / '{}.jpg'.format(ann_id))
 				img.save(img_path / '{}.png'.format(ann_id))
