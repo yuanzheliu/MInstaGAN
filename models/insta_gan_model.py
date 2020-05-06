@@ -23,7 +23,7 @@ class InstaGANModel(BaseModel):
 			parser.add_argument('--lambda_B', type=float, default=10.0, help='weight for cycle loss (B -> A -> B)')
 			parser.add_argument('--lambda_idt', type=float, default=1.0, help='use identity mapping. Setting lambda_idt other than 0 has an effect of scaling the weight of the identity mapping loss')
 			parser.add_argument('--lambda_ctx', type=float, default=1.0, help='use context preserving. Setting lambda_ctx other than 0 has an effect of scaling the weight of the context preserving loss')
-			parser.add_argument('--lambda_color', type=float, default=0.5, help='use color preserving. Setting lambda_color other than 0 has an effect of scaling the weight of the color preserving loss')
+			parser.add_argument('--lambda_color', type=float, default=0.3, help='use color preserving. Setting lambda_color other than 0 has an effect of scaling the weight of the color preserving loss')
 
 		return parser
 
@@ -130,8 +130,16 @@ class InstaGANModel(BaseModel):
 		diff = large_seg - small_seg # diff from (-1, 1)
 		return diff.clamp(max=1,min=0) * 2 - 1
 
+	def seg_skin_remove_face(self, seg_skin):
+		seg_skin_clone = seg_skin.clone()
+		seg_skin_clone = (seg_skin_clone + 1) / 2
+		height = seg_skin_clone.size(2)
+		seg_skin_clone[:, :, 0:height//4, :] = 0 # face usually locate top 1/4
+		return seg_skin_clone * 2 - 1
+
 	# real_seg (e.g. jeans) is larger than fake_seg (e.g. skirt)
 	def calculate_skin_color_diff(self, real, fake, real_seg, fake_seg, real_seg_skin):
+		real_seg_skin = self.seg_skin_remove_face(real_seg_skin)
 		# real and fake image rgb value from (-1, 1)
 		skin_avg_color = self.get_avg_color(real, real_seg_skin)
 		diff_seg = self.get_seg_diff(real_seg, fake_seg) # e.g. leg
